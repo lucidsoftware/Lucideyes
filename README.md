@@ -12,9 +12,9 @@ After importing the API into your Java project, make a new ImageCompare object b
 Access results from the `ImageCompare` object.
 
     imagecompare.isMatch()
-    imagecompare.getCircledDifferences()
-    imagecompare.getSideBySide()
     imagecompare.isSameSize()
+    imagecompare.getCircledDiff()
+    imagecompare.getPixelDiff()
 
 ## Adjusting controls
 Lucideyes verifies images by creating uniform blocks of averaged pixels.  It then checks if color distance between corresponding blocks exceeds a defined threshold.
