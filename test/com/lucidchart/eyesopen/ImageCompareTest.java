@@ -35,8 +35,8 @@ public class ImageCompareTest {
 
     @Test
     public void testSelection() throws IOException {
-        BufferedImage standard = ImageIO.read(getFile("Selected.png"));
-        BufferedImage snapshot = ImageIO.read(getFile("Unselected.png"));
+        BufferedImage standard = ImageIO.read(getFile("Selected.PNG"));
+        BufferedImage snapshot = ImageIO.read(getFile("Unselected.PNG"));
         Set<Region> mask = new HashSet<>();
         mask.add(Region.apply(0, 0, 2042, 42, RegionAction.EXCLUDE));
         ImageCompare snapshotCompare = ImageCompare.apply(
@@ -51,8 +51,8 @@ public class ImageCompareTest {
 
     @Test
     public void testSeveralDifferences() throws IOException {
-        BufferedImage standard = ImageIO.read(getFile("UnSynced.png"));
-        BufferedImage snapshot = ImageIO.read(getFile("Synced.png"));
+        BufferedImage standard = ImageIO.read(getFile("UnSynced.PNG"));
+        BufferedImage snapshot = ImageIO.read(getFile("Synced.PNG"));
         Set<Region> mask = new HashSet<>();
         mask.add(Region.apply(233, 373, 848, 416, RegionAction.FOCUS));
         ImageCompare snapshotCompare = ImageCompare.apply(
@@ -67,8 +67,8 @@ public class ImageCompareTest {
 
     @Test
     public void testCancelAnimation() throws IOException {
-        BufferedImage standard = ImageIO.read(getFile("Cancel1.png"));
-        BufferedImage snapshot = ImageIO.read(getFile("Cancel2.png"));
+        BufferedImage standard = ImageIO.read(getFile("Cancel1.PNG"));
+        BufferedImage snapshot = ImageIO.read(getFile("Cancel2.PNG"));
         Set<Region> mask = new HashSet<>();
         mask.add(Region.apply(0, 0, 1241, 55, RegionAction.EXCLUDE));
         mask.add(Region.apply(546, 960, 145, 145, RegionAction.EXCLUDE));
@@ -95,7 +95,7 @@ public class ImageCompareTest {
                 MatchLevel.STRICT,
                 mask
         );
-        saveResults(snapshotCompare, "Very Small", "png");
+        saveResults(snapshotCompare, "Very Small", "PNG");
         Assert.assertFalse(snapshotCompare.isMatch());
     }
 
