@@ -258,7 +258,7 @@ public class ImageCompareTest {
             TestImages.apply("Insignificant crop", "apple", "insignificantCrop", false, false, true),
             TestImages.apply("Extra thin light colored line", "apple", "extraThinLine", false, false, true),
             TestImages.apply("Subtle Difference3", "base", "subtleDiff3", false, false, true),
-            TestImages.apply("Slightly Miscolored Icon", "base2", "slightlyMisColoredIcons", false, false, true),
+            TestImages.apply("Slightly Miscolored Icon", "base2", "slightlyMiscoloredIcons", false, false, true),
             TestImages.apply("Extra small line", "apple", "extraLine", false, false, false),
             TestImages.apply("Unwanted light colored text", "apple", "unwantedText", false, false, false),
             TestImages.apply("Unwanted crop", "apple", "unwantedCrop", false, false, false),
