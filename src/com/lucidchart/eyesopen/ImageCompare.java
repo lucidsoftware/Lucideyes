@@ -5,6 +5,8 @@ import java.awt.image.BufferedImage;
 import java.awt.image.ColorModel;
 import java.awt.image.WritableRaster;
 import java.util.*;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /** A utility to compare the equality of two images, with the ability to adjust the definition of equality.
  * This will allow some minor differences in pixels to exist without failing the equality test.
@@ -27,6 +29,17 @@ public class ImageCompare {
     private final double maxColorDistance;
     private final boolean match;
 
+    /** Used to flag the options to perform a standard image to image comparison, or find an image within a region */
+    enum ComparisonModel {
+        STANDARD,
+        FIND_WITH_REGION
+    }
+    final ComparisonModel comparisonModel;
+
+    enum ImageType {
+        MASTER,
+        SNAPSHOT
+    }
 
     /** Map of pixels we need to check, composed from the exclusion and inclusion mask components */
     private final boolean[][] mask;
@@ -45,12 +58,18 @@ public class ImageCompare {
     private final boolean[][] blockComparisonMap;
     private double[][] blockColorDistances;
 
+    /**
+     * Use for the find within region model:
+     */
+    private final Region masterSubRegion;
+    private final Region snapshotFindLimit;
+    private Optional<Rectangle> targetFound = Optional.empty();
 
     /** Holds the masked image, when and if created */
-    private BufferedImage maskedMaster;
-    private BufferedImage maskedSnapshot;
-    private BufferedImage markedDifferences;
-    private BufferedImage pixelDiff;
+    private Optional<BufferedImage> maskedMaster = Optional.empty();
+    private Optional<BufferedImage> maskedSnapshot = Optional.empty();
+    private Optional<BufferedImage> markedDifferences = Optional.empty();
+    private Optional<BufferedImage> pixelDiff = Optional.empty();
 
     /** Provides a way of seeing the current max color difference of corresponding blocks in the images */
     private double largestColorDiff = 0.0;
@@ -71,6 +90,20 @@ public class ImageCompare {
         require(blockSize >= 1, "Block size must be greater than or equal to 1");
         require(maxColorDistance > 0, "Max color distance must be greater than 0");
 
+        // Finding an image within a region prevents focus and exclude mask requests
+        Set<Region> focusAndExcludeMask = new HashSet<>();
+        List<Region> findThisTargetMask = new ArrayList<>();
+        List<Region> withinThisRegionMask = new ArrayList<>();
+        if (maskComponents != null) {
+            focusAndExcludeMask = maskComponents.stream().filter(mc -> mc.regionAction == RegionAction.EXCLUDE || mc.regionAction == RegionAction.FOCUS).collect(Collectors.toSet());
+            findThisTargetMask = maskComponents.stream().filter(mc -> mc.regionAction == RegionAction.FIND_THIS_TARGET).collect(Collectors.toList());
+            withinThisRegionMask = maskComponents.stream().filter(mc -> mc.regionAction == RegionAction.WITHIN_THIS_BOUNDING_BOX).collect(Collectors.toList());
+            require((focusAndExcludeMask.size() > 0 && findThisTargetMask.size() == 0 && withinThisRegionMask.size() == 0) ||
+                            (focusAndExcludeMask.size() == 0 && findThisTargetMask.size() == 1 && withinThisRegionMask.size() == 1),
+                    "Finding an image within a region prevents use of focus/exclude masks, and requires ONE image target region within ONE bounding box limit region.");
+        }
+        this.comparisonModel = findThisTargetMask.isEmpty() ? ComparisonModel.STANDARD : ComparisonModel.FIND_WITH_REGION;
+
         BufferedImage imageToMeasure = master != null ? master : snapshot;
         this.imageWidth = imageToMeasure.getWidth();
         this.imageHeight = imageToMeasure.getHeight();
@@ -86,17 +119,54 @@ public class ImageCompare {
         this.blockSize = blockSize;
         this.maxColorDistance = maxColorDistance;
 
-        this.mask = composeMask(imageWidth, imageHeight, maskComponents);
-        this.blockMask = composeBlockMask(blockSize, DEFAULT_BLOCK_PIXEL_THRESHOLD, imageWidth, imageHeight, mask);
-        this.numHorizontalBlocks = blockMask.length; // Just for clarity
-        this.numVerticalBlocks = blockMask[0].length;
+        if (comparisonModel == ComparisonModel.FIND_WITH_REGION) {
+            this.snapshotFindLimit = withinThisRegionMask.get(0);
+            this.masterSubRegion = findThisTargetMask.get(0);
+            require(snapshotFindLimit.location.x >= 0 && snapshotFindLimit.location.y < master.getWidth() &&
+                    snapshotFindLimit.location.y >= 0 && snapshotFindLimit.location.y < master.getHeight(), "Location of desired range " + snapshotFindLimit.location + " must be located within the size of the snapshot (" + master.getWidth() + "," + master.getHeight() + ")");
+            require(snapshotFindLimit.location.x + snapshotFindLimit.width <= master.getWidth() &&
+                    snapshotFindLimit.location.y + snapshotFindLimit.height <= master.getHeight(), "Boundaries of specified find limits " + snapshotFindLimit.location + " with dimensions (w" + snapshotFindLimit.width + ",h" + snapshotFindLimit.height + ") exceed the snapshot image (" + master.getWidth() + "," + master.getHeight() + ")");
+            require(masterSubRegion.location.x >= 0 && masterSubRegion.location.y < master.getWidth() &&
+                    masterSubRegion.location.y >= 0 && masterSubRegion.location.y < master.getHeight(), "Location of target sub-image " + masterSubRegion.location + " must be located within the size of the image (" + master.getWidth() + "," + master.getHeight() + ")");
+            require(masterSubRegion.location.x + masterSubRegion.width <= master.getWidth() &&
+                    masterSubRegion.location.y + masterSubRegion.height <= master.getHeight(), "Boundaries of target sub-image " + masterSubRegion.location + " with dimensions (w" + masterSubRegion.width + ",h" + masterSubRegion.height + ") exceed the snapshot image (" + master.getWidth() + "," + master.getHeight() + ")");
 
-        // The grid contains a positive/negative comparison for every averaged color block in the image.
-        this.blockColorDistances = new double[numHorizontalBlocks][numVerticalBlocks];
-        this.blockComparisonMap = getAverageColorComparisonMap(blockMask, maxColorDistance, blockColorDistances);
 
-        // Returns true if every color comparison of averaged block colors is within the color distance threshold
-        this.match = allBlocksMatch(this.blockComparisonMap);
+            // This paints the mask to include the area wherein to find the target image
+            Set<Region> includeRegion = new HashSet<>();
+            includeRegion.add(Region.apply(snapshotFindLimit.location, snapshotFindLimit.width, snapshotFindLimit.height, RegionAction.FOCUS));
+            this.mask = composeMask(imageWidth, imageHeight, includeRegion);
+
+            // Block mask of the subRegion area
+            boolean[][] subRegionMask = composeMask(masterSubRegion.width, masterSubRegion.height, null);
+            this.blockMask = composeBlockMask(blockSize, DEFAULT_BLOCK_PIXEL_THRESHOLD, masterSubRegion.width, masterSubRegion.height, subRegionMask);
+            this.numHorizontalBlocks = blockMask.length; // Just for clarity
+            this.numVerticalBlocks = blockMask[0].length;
+
+            // Unused, but needs initialization
+            this.blockComparisonMap = null;
+
+            this.targetFound = imageFoundWithin(master, masterSubRegion, snapshotFindLimit, snapshot);
+            this.match = (targetFound.isPresent());
+
+        // Standard comparison model
+        } else {
+            this.mask = composeMask(imageWidth, imageHeight, focusAndExcludeMask);
+            this.blockMask = composeBlockMask(blockSize, DEFAULT_BLOCK_PIXEL_THRESHOLD, imageWidth, imageHeight, mask);
+            this.numHorizontalBlocks = blockMask.length; // Just for clarity
+            this.numVerticalBlocks = blockMask[0].length;
+
+            // Unused, but need initialization
+            this.snapshotFindLimit = null;
+            this.masterSubRegion = null;
+
+            // The grid contains a positive/negative comparison for every averaged color block in the image.
+            this.blockColorDistances = new double[numHorizontalBlocks][numVerticalBlocks];
+            this.blockComparisonMap = getAverageColorComparisonMap(blockMask, maxColorDistance, blockColorDistances);
+
+            // Returns true if every color comparison of averaged block colors is within the color distance threshold
+            this.match = allBlocksMatch(blockComparisonMap);
+        }
     }
 
 
@@ -171,48 +241,74 @@ public class ImageCompare {
      */
 
 
-    /** Returns the master darkened with the current exclusion mask */
+    /** Returns the master ged with the current exclusion mask */
     public BufferedImage getMasterWithMask() {
-        if (maskedMaster == null) maskedMaster = getMaskedImage(master, DEFAULT_DIVISOR_TO_DARKEN_MASK);
-        return maskedMaster;
+        BufferedImage masterMask = maskedMaster.orElseGet(() -> getMaskedImage(master, DEFAULT_DIVISOR_TO_DARKEN_MASK, ImageType.MASTER));
+        this.maskedMaster = Optional.of(masterMask);
+        return masterMask;
     }
 
     /** Returns the snapshot darkened with the current exclusion mask */
     public BufferedImage getSnapshotWithMask() {
-        if (maskedSnapshot == null) maskedSnapshot = getMaskedImage(snapshot, DEFAULT_DIVISOR_TO_DARKEN_MASK);
-        return maskedSnapshot;
+        BufferedImage snapshotMask = maskedSnapshot.orElseGet(() -> getMaskedImage(snapshot, DEFAULT_DIVISOR_TO_DARKEN_MASK, ImageType.SNAPSHOT));
+        this.maskedSnapshot = Optional.of(snapshotMask);
+        return snapshotMask;
     }
 
     /** Debugging utility to get image of block level mask */
     public BufferedImage getBlockMask() {
-        return getImageOfDoubleArray(blockMask, blockSize, Color.BLACK, Color.WHITE);
+        return comparisonModel == ComparisonModel.STANDARD ?
+                getImageOfDoubleArray(blockMask, blockSize, Color.BLACK, Color.WHITE) :
+                createMessageImage(commonError("Block mask"));
     }
 
     /** Debbuging utility to get image of color comparison results */
-    public BufferedImage getBlockColorComparisonResults() { return getImageOfDoubleArray(blockComparisonMap, blockSize, Color.WHITE, Color.RED);}
+    public BufferedImage getBlockColorComparisonResults() {
+        return comparisonModel == ComparisonModel.STANDARD ?
+                getImageOfDoubleArray(blockComparisonMap, blockSize, Color.WHITE, Color.RED) :
+                createMessageImage(commonError("Block comparison map"));
+    }
 
     /** Get circled differences on the snapshot image. */
     public BufferedImage getCircledDiff() {
+        if (comparisonModel == ComparisonModel.STANDARD) {
+            // no differences present
+            if (match) return getSnapshotWithMask();
 
-        // no differences present
-        if (match) return getSnapshotWithMask();
-
-        // Create the markup only if not done before
-        if (markedDifferences == null) markedDifferences = createMarkUp(blockComparisonMap, blockSize);
-        return markedDifferences;
+            // Create the markup only if not done before
+            BufferedImage circledDiff = markedDifferences.orElseGet(() -> createMarkUp(blockComparisonMap, blockSize));
+            markedDifferences = Optional.of(circledDiff);
+            return circledDiff;
+        } else return createMessageImage(commonError("Circled diff report"));
     }
 
     /** Obtain a pixel-diff overlay **/
     public BufferedImage getPixelDiff() {
-        if (pixelDiff == null) pixelDiff = createPixelDiffImage(master, snapshot, blockComparisonMap, blockMask, blockSize, maxColorDistance);
-        return pixelDiff;
+        if (comparisonModel == ComparisonModel.STANDARD) {
+            BufferedImage pDiff = pixelDiff.orElseGet(() -> createPixelDiffImage(master, snapshot, blockComparisonMap, blockMask, blockSize, maxColorDistance));
+            pixelDiff = Optional.of(pDiff);
+            return pDiff;
+        } else return createMessageImage(commonError("Pixel diff report"));
     }
+
 
     /** True if the snapshot matches the master, based on block size, color proximity, image size, and mask */
     public boolean isMatch() {
         return match;
     }
 
+
+    /** Indicates this test is trying to find a certain image match anywhere within a region */
+    public boolean isFindInRegionModel() {
+        return comparisonModel == ComparisonModel.FIND_WITH_REGION;
+    }
+
+
+    /** When using the 'find in region' model, this returns the rectangle of the location on the snapshot image.
+     * This can be helpful when needing to find and interact with a location */
+    public Optional<Rectangle> getLocationOfTargetImageOnSnapshot() {
+        return targetFound;
+    }
 
 
     /*
@@ -224,6 +320,71 @@ public class ImageCompare {
 
      */
 
+    private static String commonError(String feature) {
+        return feature + " is not available for 'find image within area' model.";
+    }
+
+    /** Creates a simple message image */
+    private static BufferedImage createMessageImage(String message) {
+
+        // https://stackoverflow.com/questions/18800717/convert-text-content-to-image
+        BufferedImage img = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2d = img.createGraphics();
+        try {
+            Font font = new Font("Arial", Font.PLAIN, 16);
+            g2d.setFont(font);
+            FontMetrics fm = g2d.getFontMetrics();
+            int width = fm.stringWidth(message);
+            int height = fm.getHeight();
+            g2d.dispose();
+
+            img = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+            g2d = img.createGraphics();
+            g2d.setRenderingHint(RenderingHints.KEY_ALPHA_INTERPOLATION, RenderingHints.VALUE_ALPHA_INTERPOLATION_QUALITY);
+            g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g2d.setRenderingHint(RenderingHints.KEY_COLOR_RENDERING, RenderingHints.VALUE_COLOR_RENDER_QUALITY);
+            g2d.setRenderingHint(RenderingHints.KEY_DITHERING, RenderingHints.VALUE_DITHER_ENABLE);
+            g2d.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
+            g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+            g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+            g2d.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
+            g2d.setFont(font);
+            fm = g2d.getFontMetrics();
+            g2d.setColor(Color.WHITE);
+            g2d.fillRect(0, 0, img.getWidth(), img.getHeight());
+            g2d.setColor(Color.BLACK);
+            g2d.drawString(message, 0, fm.getAscent());
+        } finally {
+            g2d.dispose();
+        }
+        return img;
+    }
+
+    /** Determines if a subset of an image is found within a defined bounding box. */
+    private Optional<Rectangle> imageFoundWithin(BufferedImage master, Region findThisFromMaster, Region requiredWithinThisRegion, BufferedImage snapshot) {
+
+        // Get cropped working images
+        BufferedImage croppedMaster = (findThisFromMaster == null) ? master : master.getSubimage(findThisFromMaster.location.x, findThisFromMaster.location.y, findThisFromMaster.width, findThisFromMaster.height);
+        BufferedImage croppedSnapshot = (requiredWithinThisRegion == null) ? snapshot : snapshot.getSubimage(requiredWithinThisRegion.location.x, requiredWithinThisRegion.location.y, requiredWithinThisRegion.width, requiredWithinThisRegion.height);
+
+        // If the cropped working images are the same size, find out immediately if they are the same.
+        if (croppedMaster.getHeight() == croppedSnapshot.getHeight() && croppedMaster.getWidth() == croppedSnapshot.getWidth())
+            return ImageCompare.apply(croppedMaster, croppedSnapshot).isMatch() ? Optional.of(new Rectangle(0, 0, croppedMaster.getWidth(), croppedMaster.getHeight())) : Optional.empty();
+
+        // The desired image must be at least as big as the limiting bounding box.
+        if (croppedMaster.getHeight() > croppedSnapshot.getHeight() || croppedMaster.getWidth() > croppedSnapshot.getWidth()) return Optional.empty();
+
+        // If working images are not the same size, our approach is to attempt each possibility with quick fails, until all valid attempts are exhausted.
+        int xRange = croppedSnapshot.getWidth() - croppedMaster.getWidth();
+        int yRange = croppedSnapshot.getHeight() - croppedMaster.getHeight();
+
+        for (int x = 0; x <= xRange; x++)
+            for (int y = 0; y <= yRange; y++) {
+                BufferedImage croppedSnapshotSubsetAttempt = croppedSnapshot.getSubimage(x, y, croppedMaster.getWidth(), croppedMaster.getHeight());
+                if (quickCompare(croppedMaster, croppedSnapshotSubsetAttempt, maxColorDistance)) return Optional.of(new Rectangle(x + requiredWithinThisRegion.location.x, y + requiredWithinThisRegion.location.y, croppedMaster.getWidth(), croppedMaster.getHeight()));
+            }
+        return Optional.empty();
+    }
 
     /** Marks up the snapshot to highlight differences */
     private BufferedImage createMarkUp(boolean[][] blockComparisonMap, int blockSize) {
@@ -383,6 +544,23 @@ public class ImageCompare {
     }
 
 
+    /** Makes a quick failing attempt to compare two images.
+     * This is helpful when we don't care about reports on the two images and we want to fail fast.
+     * @return true if every corresponding block in the two images averages to a color difference below the threshold.
+     */
+    private boolean quickCompare(BufferedImage one, BufferedImage two, double maxColorDistance) {
+
+        int numHorizontalBlocks = getNumHorizontalBlocks(blockMask);
+        int numVerticalBlocks = getNumVerticalBlocks(blockMask);
+
+        for (int vB = 0; vB < numVerticalBlocks; vB++)
+            for (int hB = 0; hB < numHorizontalBlocks; hB++) {
+                if (distance(averageBlockPixels(hB, vB, blockSize, one), averageBlockPixels(hB, vB, blockSize, two)) > maxColorDistance) return false;
+            }
+        return true;
+    }
+
+
     /** Compares the color distance block by block and returns a boolean map of the results
      * This map can be useful in constructing an overlay to highlight image comparison failures
      * @return a map of boolean comparison results for each color block.  TRUE means the block color comparison is under the acceptable threshold
@@ -499,23 +677,29 @@ public class ImageCompare {
 
             // Only calculate averages if the block has met the pixel threshold and is not masked.
             if (!blockMask[hB][vB]) {
-                int rSum = 0;
-                int gSum = 0;
-                int bSum = 0;
-                for (int y = vB * blockSize; (y < (vB + 1) * blockSize) && y < imageHeight; y++)
-                    for (int x = hB * blockSize; x < (hB + 1) * blockSize && x < imageWidth; x++) {
-                        int rgb = image.getRGB(x, y);
-                        // https://stackoverflow.com/questions/2615522/java-bufferedimage-getting-red-green-and-blue-individually
-                        rSum += getRed(rgb);
-                        gSum += getGreen(rgb);
-                        bSum += getBlue(rgb);
-                    }
-                int pixelsInBlock = blockSize * blockSize;
-                averagedColorBlock[hB][vB] = new Color(rSum / pixelsInBlock, gSum / pixelsInBlock, bSum / pixelsInBlock, 0);
+                averagedColorBlock[hB][vB] = averageBlockPixels(hB, vB, blockSize, image);
             }
         }
         return averagedColorBlock;
     }
+
+
+    /** Returns the average pixel of a single block */
+    private Color averageBlockPixels(int horizontalBlock, int verticalBlock, int blockSize, BufferedImage image) {
+        int rSum = 0;
+        int gSum = 0;
+        int bSum = 0;
+        for (int y = verticalBlock * blockSize; (y < (verticalBlock + 1) * blockSize) && y < image.getHeight(); y++)
+            for (int x = horizontalBlock * blockSize; x < (horizontalBlock + 1) * blockSize && x < image.getWidth(); x++) {
+                int rgb = image.getRGB(x, y);
+                // https://stackoverflow.com/questions/2615522/java-bufferedimage-getting-red-green-and-blue-individually
+                rSum += getRed(rgb);
+                gSum += getGreen(rgb);
+                bSum += getBlue(rgb);}
+        int pixelsInBlock = blockSize * blockSize;
+        return new Color(rSum / pixelsInBlock, gSum / pixelsInBlock, bSum / pixelsInBlock, 0);
+    }
+
 
     /** Returns the 'distance' between rgb values based on three dimensional distance of RGB values */
     private static double distance(Color c1, Color c2){
@@ -609,11 +793,11 @@ public class ImageCompare {
 
 
     /** Obtain image with mask darkened */
-    private BufferedImage getMaskedImage(BufferedImage image, int divisorToDarkenMask) {
+    private BufferedImage getMaskedImage(BufferedImage image, int divisorToDarkenMask, ImageType imageType) {
         BufferedImage maskedImage = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_RGB);
         for (int x = 0; x < image.getWidth(); x++)
             for (int y = 0; y < image.getHeight(); y++) {
-                int originalPixel = image.getRGB(x,y);
+                int originalPixel = image.getRGB(x, y);
                 int newPixel;
 
                 // If blocked out, make the pixels darker
@@ -626,8 +810,30 @@ public class ImageCompare {
 
                 maskedImage.setRGB(x, y, newPixel);
             }
+
+        // If a 'Find within Region' model we will outline the desired image on master, and outline where it was found on the snapshot
+        if (comparisonModel == ComparisonModel.FIND_WITH_REGION) {
+            Optional<Rectangle> rectangle = (imageType == ImageType.MASTER) ? Optional.of(new Rectangle(masterSubRegion.location.x, masterSubRegion.location.y, masterSubRegion.width, masterSubRegion.height)) : targetFound;
+
+            rectangle.ifPresent(r -> {
+                Graphics2D graph = maskedImage.createGraphics();
+                try {
+                    graph.setColor(neonPink);
+                    graph.drawRect(r.x, r.y, r.width, r.height);
+                    graph.setColor(new Color(246, 24, 127, 100));
+                    graph.fill(new Rectangle(r.x + 2, r.y + 2, r.width - 4, r.height - 4));
+                    graph.setColor(Color.WHITE);
+                    graph.drawRect(r.x - 1, r.y - 1, r.width + 2, r.height + 2);
+                    graph.drawRect(r.x + 1, r.y + 1, r.width - 2, r.height - 2);
+                } finally {
+                    graph.dispose();
+                }
+            });
+        }
         return maskedImage;
     }
+
+    private static final Color neonPink = new Color(246, 24, 127);
 
     /**
      * Obtain a pixel diff image.  This will probably be one of the more useful features :)
@@ -700,21 +906,32 @@ public class ImageCompare {
 
     @Override
     public String toString() {
-        StringBuilder blockResults = new StringBuilder("");
-        for (int x = 0; x < numHorizontalBlocks; x++)
-            for (int y = 0; y < numVerticalBlocks; y++) {
-                blockResults.append(String.format("(%d,%d) %s %s| ", x, y, blockMask[x][y] ? "masked" : "unmasked", (!blockMask[x][y] ? String.format("%s<<%.1f>>%s", (blockColorDistances[x][y]>maxColorDistance ? ConsoleColor.ANSI_RED : ""), blockColorDistances[x][y], ""+ConsoleColor.ANSI_RESET) : "")));
-            }
-        return "LucidCompare{" +
-                "imageHeight=" + imageHeight +
-                ", imageWidth=" + imageWidth +
-                ", blockSize=" + blockSize +
-                ", numVerticalBlocks=" + numVerticalBlocks +
-                ", numHorizontalBlocks=" + numHorizontalBlocks +
-                ", maxColorDistance=" + maxColorDistance +
-                ", largestColorDiff=" + largestColorDiff +
-                ", match=" + match +
-                ", blockMask=" + blockResults +
-                '}';
+        if (comparisonModel == ComparisonModel.STANDARD) {
+            StringBuilder blockResults = new StringBuilder("");
+            for (int x = 0; x < numHorizontalBlocks; x++)
+                for (int y = 0; y < numVerticalBlocks; y++) {
+                    blockResults.append(String.format("(%d,%d) %s %s| ", x, y, blockMask[x][y] ? "masked" : "unmasked", (!blockMask[x][y] ? String.format("%s<<%.1f>>%s", (blockColorDistances[x][y] > maxColorDistance ? ConsoleColor.ANSI_RED : ""), blockColorDistances[x][y], "" + ConsoleColor.ANSI_RESET) : "")));
+                }
+            return "StandardLucidCompare{" +
+                    "imageHeight=" + imageHeight +
+                    ", imageWidth=" + imageWidth +
+                    ", blockSize=" + blockSize +
+                    ", numVerticalBlocks=" + numVerticalBlocks +
+                    ", numHorizontalBlocks=" + numHorizontalBlocks +
+                    ", maxColorDistance=" + maxColorDistance +
+                    ", largestColorDiff=" + largestColorDiff +
+                    ", match=" + match +
+                    ", blockMask=" + blockResults +
+                    '}';
+        } else {
+            return "ImageFind{" +
+                    "imageHeight=" + imageHeight +
+                    ", imageWidth=" + imageWidth +
+                    ", masterSubImage=" + masterSubRegion +
+                    ", snapshotFindRestriction=" + snapshotFindLimit +
+                    ", match=" + match +
+                    ", targetFound= " + targetFound +
+                    "}";
+        }
     }
 }

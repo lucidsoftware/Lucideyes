@@ -19,8 +19,8 @@ public class ImageCompareTest {
     }
 
     private void saveResults(ImageCompare imageTest, String name, String extension) throws IOException {
-        saveImage(imageTest.getSnapshotWithMask(), name, "Masked", extension);
-        saveImage(imageTest.getMasterWithMask(), name, "Standard-Masked", extension);
+        saveImage(imageTest.getSnapshotWithMask(), name, "Snapshot-Masked", extension);
+        saveImage(imageTest.getMasterWithMask(), name, "Master-Masked", extension);
         saveImage(imageTest.getBlockMask(), name, "Block Mask", extension);
         saveImage(imageTest.getPixelDiff(), name, "Pixel Diff", extension);
         saveImage(imageTest.getBlockColorComparisonResults(), name, "BlockColorComparisonMap", extension);
@@ -303,8 +303,8 @@ public class ImageCompareTest {
 //                    ConsoleColor.ANSI_RESET);
 
         passed = passed && casePassed;
+        }
+        Assert.assertTrue(passed);
     }
-    Assert.assertTrue(passed);
-}
 
 }
