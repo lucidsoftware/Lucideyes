@@ -5,33 +5,16 @@ import org.testng.annotations.Test;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+import static com.lucidchart.eyesopen.TestUtil.getFile;
+import static com.lucidchart.eyesopen.TestUtil.saveResults;
 
 public class ImageCompareTest {
-
-    private File getFile(String fileNameWithExtension) {
-        return Paths.get("./test/com/lucidchart/eyesopen/inputImages/" + fileNameWithExtension).toFile();
-    }
-
-    private void saveResults(ImageCompare imageTest, String name, String extension) throws IOException {
-        saveImage(imageTest.getSnapshotWithMask(), name, "Snapshot-Masked", extension);
-        saveImage(imageTest.getMasterWithMask(), name, "Master-Masked", extension);
-        saveImage(imageTest.getBlockMask(), name, "Block Mask", extension);
-        saveImage(imageTest.getPixelDiff(), name, "Pixel Diff", extension);
-        saveImage(imageTest.getBlockColorComparisonResults(), name, "BlockColorComparisonMap", extension);
-        saveImage(imageTest.getCircledDiff(), name, "Marked-Up", extension);
-    }
-
-    private void saveImage(BufferedImage image, String name, String description, String extension) throws IOException {
-        Path testOutputDir = Files.createDirectories(Paths.get("./output/"+name));
-        File output = new File(testOutputDir + "/" + description + "." + extension);
-        ImageIO.write(image, extension, output);
-    }
 
     @Test
     public void testSelection() throws IOException {
@@ -45,7 +28,7 @@ public class ImageCompareTest {
                 MatchLevel.TOLERANT,
                 mask
         );
-        saveResults(snapshotCompare, "BigDifferences", "jpg");
+        saveResults(snapshotCompare, "BigDifferences");
         Assert.assertFalse(snapshotCompare.isMatch());
     }
 
@@ -61,7 +44,7 @@ public class ImageCompareTest {
                 MatchLevel.TOLERANT,
                 mask
         );
-        saveResults(snapshotCompare, "SeveralDifferences", "jpg");
+        saveResults(snapshotCompare, "SeveralDifferences");
         Assert.assertFalse(snapshotCompare.isMatch());
     }
 
@@ -78,7 +61,7 @@ public class ImageCompareTest {
                 MatchLevel.TOLERANT,
                 mask
         );
-        saveResults(snapshotCompare, "CancelAnimation", "jpg");
+        saveResults(snapshotCompare, "CancelAnimation");
         Assert.assertTrue(snapshotCompare.isMatch());
     }
 
@@ -95,7 +78,7 @@ public class ImageCompareTest {
                 MatchLevel.STRICT,
                 mask
         );
-        saveResults(snapshotCompare, "Very Small", "PNG");
+        saveResults(snapshotCompare, "Very Small");
         Assert.assertFalse(snapshotCompare.isMatch());
     }
 
@@ -112,7 +95,7 @@ public class ImageCompareTest {
                 MatchLevel.STRICT,
                 mask
         );
-        saveResults(snapshotCompare, "InsideInclusion", "jpg");
+        saveResults(snapshotCompare, "InsideInclusion");
         Assert.assertFalse(snapshotCompare.isMatch());
     }
 
@@ -129,7 +112,7 @@ public class ImageCompareTest {
                 MatchLevel.TOLERANT,
                 mask
         );
-        saveResults(snapshotCompare, "OutsideFocus", "jpg");
+        saveResults(snapshotCompare, "OutsideFocus");
         Assert.assertTrue(snapshotCompare.isMatch());
     }
 
@@ -147,7 +130,7 @@ public class ImageCompareTest {
                 MatchLevel.STRICT,
                 mask
         );
-        saveResults(snapshotCompare, "InsideFocusAndExcluded", "jpg");
+        saveResults(snapshotCompare, "InsideFocusAndExcluded");
         Assert.assertTrue(snapshotCompare.isMatch());
     }
 
@@ -165,7 +148,7 @@ public class ImageCompareTest {
                 MatchLevel.TOLERANT,
                 mask
         );
-        saveResults(snapshotCompare, "InsideFocusAndPartiallyExcluded", "jpg");
+        saveResults(snapshotCompare, "InsideFocusAndPartiallyExcluded");
         Assert.assertFalse(snapshotCompare.isMatch());
     }
 
@@ -182,7 +165,7 @@ public class ImageCompareTest {
                 MatchLevel.TOLERANT,
                 mask
         );
-        saveResults(snapshotCompare, "Excluded", "jpg");
+        saveResults(snapshotCompare, "Excluded");
         Assert.assertTrue(snapshotCompare.isMatch());
     }
 
@@ -199,7 +182,7 @@ public class ImageCompareTest {
                 MatchLevel.STRICT,
                 mask
         );
-        saveResults(snapshotCompare, "NotExcluded", "jpg");
+        saveResults(snapshotCompare, "NotExcluded");
         Assert.assertFalse(snapshotCompare.isMatch());
     }
 
@@ -212,7 +195,7 @@ public class ImageCompareTest {
                 snapshot,
                 MatchLevel.STRICT
         );
-        saveResults(snapshotCompare, "extraThinLine", "jpg");
+        saveResults(snapshotCompare, "extraThinLine");
         Assert.assertFalse(snapshotCompare.isMatch());
     }
 

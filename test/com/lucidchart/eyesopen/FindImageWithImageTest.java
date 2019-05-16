@@ -6,34 +6,14 @@ import org.testng.annotations.Test;
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.HashSet;
 import java.util.Set;
 
+import static com.lucidchart.eyesopen.TestUtil.getFile;
+import static com.lucidchart.eyesopen.TestUtil.saveResults;
+
 public class FindImageWithImageTest {
-
-    private File getFile(String fileNameWithExtension) {
-        return Paths.get("./test/com/lucidchart/eyesopen/inputImages/" + fileNameWithExtension).toFile();
-    }
-
-    private void saveResults(ImageCompare imageTest, String name, String extension) throws IOException {
-        saveImage(imageTest.getSnapshotWithMask(), name, "Snapshot-Masked", extension);
-        saveImage(imageTest.getMasterWithMask(), name, "Master-Masked", extension);
-        saveImage(imageTest.getBlockMask(), name, "Block Mask", extension);
-        saveImage(imageTest.getPixelDiff(), name, "Pixel Diff", extension);
-        saveImage(imageTest.getBlockColorComparisonResults(), name, "BlockColorComparisonMap", extension);
-        saveImage(imageTest.getCircledDiff(), name, "Marked-Up", extension);
-    }
-
-    private void saveImage(BufferedImage image, String name, String description, String extension) throws IOException {
-        Path testOutputDir = Files.createDirectories(Paths.get("./output/"+name));
-        File output = new File(testOutputDir + "/" + description + "." + extension);
-        ImageIO.write(image, extension, output);
-    }
 
     @Test
     public void testFindImageWithinRegionWithTightMask() throws IOException {
@@ -48,7 +28,7 @@ public class FindImageWithImageTest {
                 MatchLevel.TOLERANT,
                 mask
         );
-        saveResults(snapshotCompare, "FindImageWithinRegionWithTightMask", "jpg");
+        saveResults(snapshotCompare, "FindImageWithinRegionWithTightMask");
         Assert.assertTrue(snapshotCompare.isFindInRegionModel());
         Assert.assertEquals(snapshotCompare.getLocationOfTargetImageOnSnapshot().orElseThrow(() -> new RuntimeException("The location of the target on the snapshot was not found.")), new Rectangle(253, 339, 24, 32));
         Assert.assertTrue(snapshotCompare.isMatch());
@@ -61,7 +41,6 @@ public class FindImageWithImageTest {
         BufferedImage snapshot = ImageIO.read(getFile("Selected.PNG"));
         Set<Region> mask = new HashSet<>();
         mask.add(Region.apply(254, 340, 24, 32, RegionAction.FIND_THIS_TARGET));
-        //mask.add(Region.apply(235, 325, 220, 220, RegionAction.WITHIN_THIS_BOUNDING_BOX));
         mask.add(Region.apply(253, 330, 26, 60, RegionAction.WITHIN_THIS_BOUNDING_BOX));
         ImageCompare snapshotCompare = ImageCompare.apply(
                 standard,
@@ -69,7 +48,7 @@ public class FindImageWithImageTest {
                 MatchLevel.TOLERANT,
                 mask
         );
-        saveResults(snapshotCompare, "FindImageWithinRegionWithLooseMask", "jpg");
+        saveResults(snapshotCompare, "FindImageWithinRegionWithLooseMask");
         Assert.assertTrue(snapshotCompare.isFindInRegionModel());
         Assert.assertEquals(snapshotCompare.getLocationOfTargetImageOnSnapshot().orElseThrow(() -> new RuntimeException("The location of the target on the snapshot was not found.")), new Rectangle(253, 339, 24, 32));
         Assert.assertTrue(snapshotCompare.isMatch());
@@ -88,7 +67,7 @@ public class FindImageWithImageTest {
                 MatchLevel.apply(5, 20.0),
                 mask
         );
-        saveResults(snapshotCompare, "FindImageWithinRegionWithVeryLooseMask", "jpg");
+        saveResults(snapshotCompare, "FindImageWithinRegionWithVeryLooseMask");
         Assert.assertTrue(snapshotCompare.isFindInRegionModel());
         Assert.assertEquals(snapshotCompare.getLocationOfTargetImageOnSnapshot().orElseThrow(() -> new RuntimeException("The location of the target on the snapshot was not found.")), new Rectangle(254, 340, 24, 32));
         Assert.assertTrue(snapshotCompare.isMatch());
@@ -107,7 +86,7 @@ public class FindImageWithImageTest {
                 MatchLevel.TOLERANT,
                 mask
         );
-        saveResults(snapshotCompare, "NotFindingImageWithinRegion", "jpg");
+        saveResults(snapshotCompare, "NotFindingImageWithinRegion");
         Assert.assertTrue(snapshotCompare.isFindInRegionModel());
         Assert.assertFalse(snapshotCompare.getLocationOfTargetImageOnSnapshot().isPresent());
         Assert.assertFalse(snapshotCompare.isMatch());
@@ -126,7 +105,7 @@ public class FindImageWithImageTest {
                 MatchLevel.TOLERANT,
                 mask
         );
-        saveResults(snapshotCompare, "FindImageWithinRegion2", "jpg");
+        saveResults(snapshotCompare, "FindImageWithinRegion2");
         Assert.assertTrue(snapshotCompare.isFindInRegionModel());
         Assert.assertEquals(snapshotCompare.getLocationOfTargetImageOnSnapshot().orElseThrow(() -> new RuntimeException("The location of the target on the snapshot was not found.")), new Rectangle(251, 420, 28, 28));
         Assert.assertTrue(snapshotCompare.isMatch());
@@ -145,7 +124,7 @@ public class FindImageWithImageTest {
                 MatchLevel.TOLERANT,
                 mask
         );
-        saveResults(snapshotCompare, "FindLargerImageWithinRegion3", "jpg");
+        saveResults(snapshotCompare, "FindLargerImageWithinRegion3");
         Assert.assertTrue(snapshotCompare.isFindInRegionModel());
         Assert.assertEquals(snapshotCompare.getLocationOfTargetImageOnSnapshot().orElseThrow(() -> new RuntimeException("The location of the target on the snapshot was not found.")), new Rectangle(311, 716, 275, 188));
         Assert.assertTrue(snapshotCompare.isMatch());
@@ -164,7 +143,7 @@ public class FindImageWithImageTest {
                 MatchLevel.TOLERANT,
                 mask
         );
-        saveResults(snapshotCompare, "FindWithNoYVariation", "jpg");
+        saveResults(snapshotCompare, "FindWithNoYVariation");
         Assert.assertTrue(snapshotCompare.isFindInRegionModel());
         Assert.assertEquals(snapshotCompare.getLocationOfTargetImageOnSnapshot().orElseThrow(() -> new RuntimeException("The location of the target on the snapshot was not found.")), new Rectangle(10, 0, 584, 1082));
         Assert.assertTrue(snapshotCompare.isMatch());
@@ -183,7 +162,7 @@ public class FindImageWithImageTest {
                 MatchLevel.TOLERANT,
                 mask
         );
-        saveResults(snapshotCompare, "FindWithNoXVariation", "jpg");
+        saveResults(snapshotCompare, "FindWithNoXVariation");
         Assert.assertTrue(snapshotCompare.isFindInRegionModel());
         Assert.assertEquals(snapshotCompare.getLocationOfTargetImageOnSnapshot().orElseThrow(() -> new RuntimeException("The location of the target on the snapshot was not found.")), new Rectangle(0, 29, 604, 1010));
         Assert.assertTrue(snapshotCompare.isMatch());
