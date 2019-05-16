@@ -105,7 +105,7 @@ public class ImageCompare {
         require(maxColorDistance > 0, "Max color distance must be greater than 0");
 
         Set<Region> focusAndExcludeMask = new HashSet<>();
-        List<Region> findThisTargetMask = new ArrayList<>(); //todo handle find within to any a varied size image, maybe just extend the boundaries just a little.
+        List<Region> findThisTargetMask = new ArrayList<>();
         List<Region> withinThisRegionMask = new ArrayList<>();
 
         if (maskComponents != null) {
@@ -128,80 +128,82 @@ public class ImageCompare {
         if (snapshot == null) snapshot = new BufferedImage(imageWidth, imageHeight, BufferedImage.TYPE_INT_RGB);
         if (master == null) master = new BufferedImage(imageWidth, imageHeight, BufferedImage.TYPE_INT_RGB);
 
-        // Handle slightly different image sizes
+        // Handle slightly different image sizes.  However we will not currently support the 'find with region' model for different sized snapshots
         Optional<BufferedImage> resizedSnapshot = Optional.empty();
-        Optional<Rectangle> locationInMaster;
-        if (master.getHeight() != snapshot.getHeight() || master.getWidth() != snapshot.getWidth()) {
+        if (comparisonModel == ComparisonModel.STANDARD) {
+            Optional<Rectangle> locationInMaster;
+            if (master.getHeight() != snapshot.getHeight() || master.getWidth() != snapshot.getWidth()) {
 
-            // Only allow so much variance before failing
-            require(Math.abs(snapshot.getHeight() - imageHeight) < MAX_SIZE_DIFFERENCE_ALLOWED &&
-                            Math.abs(snapshot.getWidth() - imageWidth) < MAX_SIZE_DIFFERENCE_ALLOWED &&
-                            // We will not support checking images if one dimension is larger and the other is smaller (eg. width of snapshot is smaller than master and height of snapshot is larger)
-                            !(snapshot.getWidth() * imageWidth < 0 || snapshot.getHeight() * imageHeight < 0),
-                    "SNAPSHOT IS DIFFERENT SIZE FROM MASTER | Master and snapshot images sizes must be essentially the same size, within " + MAX_SIZE_DIFFERENCE_ALLOWED + " pixels.  Master: (w" + master.getWidth() + ",h" + master.getHeight() + ") Snapshot: (w" + snapshot.getWidth() + ",h" + snapshot.getHeight() + ").  Within the size difference threshold, an attempt is made to match the smaller image inside the other when both dimensions of the snapshot are either smaller or larger.");
+                // Only allow so much variance before failing
+                require(Math.abs(snapshot.getHeight() - imageHeight) < MAX_SIZE_DIFFERENCE_ALLOWED &&
+                                Math.abs(snapshot.getWidth() - imageWidth) < MAX_SIZE_DIFFERENCE_ALLOWED &&
+                                // We will not support checking images if one dimension is larger and the other is smaller (eg. width of snapshot is smaller than master and height of snapshot is larger)
+                                !(snapshot.getWidth() * imageWidth < 0 || snapshot.getHeight() * imageHeight < 0),
+                        "SNAPSHOT IS DIFFERENT SIZE FROM MASTER | Master and snapshot images sizes must be essentially the same size, within " + MAX_SIZE_DIFFERENCE_ALLOWED + " pixels.  Master: (w" + master.getWidth() + ",h" + master.getHeight() + ") Snapshot: (w" + snapshot.getWidth() + ",h" + snapshot.getHeight() + ").  Within the size difference threshold, an attempt is made to match the smaller image inside the other when both dimensions of the snapshot are either smaller or larger.");
 
 
-            boolean[][] tempMask = composeMask(imageWidth, imageHeight, focusAndExcludeMask);
-            boolean[][] tempBlockMask = composeBlockMask(blockSize, DEFAULT_BLOCK_PIXEL_THRESHOLD, imageWidth, imageHeight, tempMask);
+                boolean[][] tempMask = composeMask(imageWidth, imageHeight, focusAndExcludeMask);
+                boolean[][] tempBlockMask = composeBlockMask(blockSize, DEFAULT_BLOCK_PIXEL_THRESHOLD, imageWidth, imageHeight, tempMask);
 
-            // If snapshot is bigger than master, check to see if master exists as a subset of snapshot
-            if (snapshot.getWidth() > imageWidth) {
-                BufferedImage snapshotHolder = cloneBufferedImage(snapshot);
-                Optional<Rectangle> locationOfMatch = imageFoundWithin(master, null, null, snapshot, tempBlockMask, MaskType.BLOCK);
-                resizedSnapshot = locationOfMatch.map(loc -> snapshotHolder.getSubimage(loc.x, loc.y, imageWidth, imageHeight));
-            }
+                // If snapshot is bigger than master, check to see if master exists as a subset of snapshot
+                if (snapshot.getWidth() > imageWidth) {
+                    BufferedImage snapshotHolder = cloneBufferedImage(snapshot);
+                    Optional<Rectangle> locationOfMatch = imageFoundWithin(master, null, null, snapshot, tempBlockMask, MaskType.BLOCK);
+                    resizedSnapshot = locationOfMatch.map(loc -> snapshotHolder.getSubimage(loc.x, loc.y, imageWidth, imageHeight));
+                }
 
-            // If master is bigger than snapshot, see if snapshot exists as a subset of master
-            else {
-                BufferedImage masterHolder = cloneBufferedImage(master);
-                BufferedImage snapshotHolder = cloneBufferedImage(snapshot);
-                Color expandedColor = Color.MAGENTA;
-                locationInMaster = imageFoundWithin(snapshot, null, null, master, tempMask, MaskType.PIXEL);
+                // If master is bigger than snapshot, see if snapshot exists as a subset of master
+                else {
+                    BufferedImage masterHolder = cloneBufferedImage(master);
+                    BufferedImage snapshotHolder = cloneBufferedImage(snapshot);
+                    Color expandedColor = Color.MAGENTA;
+                    locationInMaster = imageFoundWithin(snapshot, null, null, master, tempMask, MaskType.PIXEL);
 
-                // Expand snapshot to match master
-                Optional<Set<Rectangle>> addedSnapshotMargins = locationInMaster.map(loc -> {
-                            Set<Rectangle> expRegions = new HashSet<>();
-                            if (loc.y > 0) {
-                                expRegions.add(new Rectangle(0, 0, masterHolder.getWidth(), loc.y));
-                                addedMaskAreas.add(new Rectangle(0, 0, masterHolder.getWidth(), getTouchingBlocks(loc.y)));
-                            }
-                            if (loc.x > 0) {
-                                expRegions.add(new Rectangle(0, 0, loc.x, masterHolder.getHeight()));
-                                addedMaskAreas.add(new Rectangle(0, 0, getTouchingBlocks(loc.x), masterHolder.getHeight()));
-                            }
-                            int bottomMargin = masterHolder.getHeight() - loc.y - loc.height;
-                            int rightMargin = masterHolder.getWidth() - loc.x - loc.width;
-                            if (bottomMargin > 0) {
-                                expRegions.add(new Rectangle(0, loc.y + loc.height, masterHolder.getWidth(), bottomMargin));
-                                int touchingBlocks = getTouchingBlocks(bottomMargin);
-                                addedMaskAreas.add(new Rectangle(0, loc.y + loc.height - touchingBlocks + bottomMargin, masterHolder.getWidth(), touchingBlocks));
-                            }
-                            if (rightMargin > 0)
-                                expRegions.add(new Rectangle(loc.x + loc.width, 0, rightMargin, masterHolder.getHeight()));
-                            int touchingBlocks = getTouchingBlocks(rightMargin);
-                            addedMaskAreas.add(new Rectangle(loc.x + loc.width - touchingBlocks + rightMargin, 0, touchingBlocks, masterHolder.getHeight()));
-                            return expRegions;
-                        });
+                    // Expand snapshot to match master
+                    Optional<Set<Rectangle>> addedSnapshotMargins = locationInMaster.map(loc -> {
+                        Set<Rectangle> expRegions = new HashSet<>();
+                        if (loc.y > 0) {
+                            expRegions.add(new Rectangle(0, 0, masterHolder.getWidth(), loc.y));
+                            addedMaskAreas.add(new Rectangle(0, 0, masterHolder.getWidth(), getTouchingBlocks(loc.y)));
+                        }
+                        if (loc.x > 0) {
+                            expRegions.add(new Rectangle(0, 0, loc.x, masterHolder.getHeight()));
+                            addedMaskAreas.add(new Rectangle(0, 0, getTouchingBlocks(loc.x), masterHolder.getHeight()));
+                        }
+                        int bottomMargin = masterHolder.getHeight() - loc.y - loc.height;
+                        int rightMargin = masterHolder.getWidth() - loc.x - loc.width;
+                        if (bottomMargin > 0) {
+                            expRegions.add(new Rectangle(0, loc.y + loc.height, masterHolder.getWidth(), bottomMargin));
+                            int touchingBlocks = getTouchingBlocks(bottomMargin);
+                            addedMaskAreas.add(new Rectangle(0, loc.y + loc.height - touchingBlocks + bottomMargin, masterHolder.getWidth(), touchingBlocks));
+                        }
+                        if (rightMargin > 0)
+                            expRegions.add(new Rectangle(loc.x + loc.width, 0, rightMargin, masterHolder.getHeight()));
+                        int touchingBlocks = getTouchingBlocks(rightMargin);
+                        addedMaskAreas.add(new Rectangle(loc.x + loc.width - touchingBlocks + rightMargin, 0, touchingBlocks, masterHolder.getHeight()));
+                        return expRegions;
+                    });
 
-                resizedSnapshot = locationInMaster.map(loc -> {
-                    // Expand snapshot to match master by adding a noticeable expansion color to the buffer.
-                    BufferedImage expandedSnapshot = new BufferedImage(masterHolder.getWidth(), masterHolder.getHeight(), BufferedImage.TYPE_INT_RGB);
-                    Graphics2D graph = expandedSnapshot.createGraphics();
-                    try {
-                        graph.setColor(expandedColor);
-                        addedSnapshotMargins.ifPresent(set -> set.forEach(rect -> graph.fill(rect)));
-                    } finally {
-                        graph.dispose();
-                    }
-                    // Add the snapshot to the image.
-                    Graphics g = expandedSnapshot.getGraphics();
-                    try {
-                        g.drawImage(snapshotHolder, loc.x, loc.y, null);
-                    } finally {
-                        g.dispose();
-                    }
-                    return expandedSnapshot;
-                });
+                    resizedSnapshot = locationInMaster.map(loc -> {
+                        // Expand snapshot to match master by adding a noticeable expansion color to the buffer.
+                        BufferedImage expandedSnapshot = new BufferedImage(masterHolder.getWidth(), masterHolder.getHeight(), BufferedImage.TYPE_INT_RGB);
+                        Graphics2D graph = expandedSnapshot.createGraphics();
+                        try {
+                            graph.setColor(expandedColor);
+                            addedSnapshotMargins.ifPresent(set -> set.forEach(rect -> graph.fill(rect)));
+                        } finally {
+                            graph.dispose();
+                        }
+                        // Add the snapshot to the image.
+                        Graphics g = expandedSnapshot.getGraphics();
+                        try {
+                            g.drawImage(snapshotHolder, loc.x, loc.y, null);
+                        } finally {
+                            g.dispose();
+                        }
+                        return expandedSnapshot;
+                    });
+                }
             }
 
         }
@@ -212,7 +214,7 @@ public class ImageCompare {
 
         // Snapshot and master must be equal at this point.
         require(this.master.getHeight() == this.snapshot.getHeight() && this.master.getWidth() == this.snapshot.getWidth(),
-                "SNAPSHOT IS DIFFERENT SIZE FROM MASTER | Master: (" + master.getWidth() + ",h" + master.getHeight() + ") Snapshot: (w" + snapshot.getWidth() + ",h" + snapshot.getHeight() + "). For small image size differences, an attempt is made to find the smaller image inside the other, however a match was not found.");
+                "SNAPSHOT IS DIFFERENT SIZE FROM MASTER | Master: (" + master.getWidth() + ",h" + master.getHeight() + ") Snapshot: (w" + snapshot.getWidth() + ",h" + snapshot.getHeight() + ").");
 
         Set<Region> finalMaskComponents = focusAndExcludeMask;
         addedMaskAreas.forEach(rect -> finalMaskComponents.add(Region.apply(rect.x, rect.y, rect.width, rect.height, RegionAction.EXCLUDE)));
