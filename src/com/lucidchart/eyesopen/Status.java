@@ -8,6 +8,8 @@ public enum Status {
     // Initial comparisons results
     PASSED ("Passed", Color.GREEN, ConsoleColor.ANSI_GREEN),
     FAILED ("Failed", Color.RED, ConsoleColor.ANSI_RED),
+    FAILED_TO_FIND_IMAGE_IN_REGION("Failed To Find Image In Region", Color.RED, ConsoleColor.ANSI_RED),
+    DIFFERENT_SIZE("Different Size", Color.RED, ConsoleColor.ANSI_RED),
     MISSING ("Missing", Color.DARK_GRAY, ConsoleColor.ANSI_RED),
     NEEDS_APPROVAL ("Needs Approval", Color.MAGENTA, ConsoleColor.ANSI_PURPLE),
 

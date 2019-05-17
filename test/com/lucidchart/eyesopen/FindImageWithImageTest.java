@@ -30,8 +30,9 @@ public class FindImageWithImageTest {
         );
         saveResults(snapshotCompare, "FindImageWithinRegionWithTightMask");
         Assert.assertTrue(snapshotCompare.isFindInRegionModel());
-        Assert.assertEquals(snapshotCompare.getLocationOfTargetImageOnSnapshot().orElseThrow(() -> new RuntimeException("The location of the target on the snapshot was not found.")), new Rectangle(253, 339, 24, 32));
+        Assert.assertEquals(snapshotCompare.getTargetLocationFound().orElseThrow(() -> new RuntimeException("The location of the target on the snapshot was not found.")), new Rectangle(253, 339, 24, 32));
         Assert.assertTrue(snapshotCompare.isMatch());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.PASSED);
     }
 
 
@@ -50,8 +51,9 @@ public class FindImageWithImageTest {
         );
         saveResults(snapshotCompare, "FindImageWithinRegionWithLooseMask");
         Assert.assertTrue(snapshotCompare.isFindInRegionModel());
-        Assert.assertEquals(snapshotCompare.getLocationOfTargetImageOnSnapshot().orElseThrow(() -> new RuntimeException("The location of the target on the snapshot was not found.")), new Rectangle(253, 339, 24, 32));
+        Assert.assertEquals(snapshotCompare.getTargetLocationFound().orElseThrow(() -> new RuntimeException("The location of the target on the snapshot was not found.")), new Rectangle(253, 339, 24, 32));
         Assert.assertTrue(snapshotCompare.isMatch());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.PASSED);
     }
 
     @Test
@@ -69,8 +71,9 @@ public class FindImageWithImageTest {
         );
         saveResults(snapshotCompare, "FindImageWithinRegionWithVeryLooseMask");
         Assert.assertTrue(snapshotCompare.isFindInRegionModel());
-        Assert.assertEquals(snapshotCompare.getLocationOfTargetImageOnSnapshot().orElseThrow(() -> new RuntimeException("The location of the target on the snapshot was not found.")), new Rectangle(254, 340, 24, 32));
+        Assert.assertEquals(snapshotCompare.getTargetLocationFound().orElseThrow(() -> new RuntimeException("The location of the target on the snapshot was not found.")), new Rectangle(254, 340, 24, 32));
         Assert.assertTrue(snapshotCompare.isMatch());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.PASSED);
     }
 
     @Test
@@ -88,8 +91,9 @@ public class FindImageWithImageTest {
         );
         saveResults(snapshotCompare, "NotFindingImageWithinRegion");
         Assert.assertTrue(snapshotCompare.isFindInRegionModel());
-        Assert.assertFalse(snapshotCompare.getLocationOfTargetImageOnSnapshot().isPresent());
+        Assert.assertFalse(snapshotCompare.getTargetLocationFound().isPresent());
         Assert.assertFalse(snapshotCompare.isMatch());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.FAILED_TO_FIND_IMAGE_IN_REGION);
     }
 
     @Test
@@ -98,7 +102,7 @@ public class FindImageWithImageTest {
         BufferedImage snapshot = ImageIO.read(getFile("Selected.PNG"));
         Set<Region> mask = new HashSet<>();
         mask.add(Region.apply(332, 342, 28, 28, RegionAction.FIND_THIS_TARGET));
-        mask.add(Region.apply(235, 400, 160, 160, RegionAction.WITHIN_THIS_BOUNDING_BOX));
+        mask.add(Region.apply(150, 410, 200, 60, RegionAction.WITHIN_THIS_BOUNDING_BOX));
         ImageCompare snapshotCompare = ImageCompare.apply(
                 standard,
                 snapshot,
@@ -107,8 +111,12 @@ public class FindImageWithImageTest {
         );
         saveResults(snapshotCompare, "FindImageWithinRegion2");
         Assert.assertTrue(snapshotCompare.isFindInRegionModel());
-        Assert.assertEquals(snapshotCompare.getLocationOfTargetImageOnSnapshot().orElseThrow(() -> new RuntimeException("The location of the target on the snapshot was not found.")), new Rectangle(251, 420, 28, 28));
+        Assert.assertEquals(
+                snapshotCompare.getTargetLocationFound().orElseThrow(
+                        () -> new RuntimeException("The location of the target on the snapshot was not found.")),
+                new Rectangle(251, 420, 28, 28));
         Assert.assertTrue(snapshotCompare.isMatch());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.PASSED);
     }
 
     @Test
@@ -126,8 +134,12 @@ public class FindImageWithImageTest {
         );
         saveResults(snapshotCompare, "FindLargerImageWithinRegion3");
         Assert.assertTrue(snapshotCompare.isFindInRegionModel());
-        Assert.assertEquals(snapshotCompare.getLocationOfTargetImageOnSnapshot().orElseThrow(() -> new RuntimeException("The location of the target on the snapshot was not found.")), new Rectangle(311, 716, 275, 188));
+        Assert.assertEquals(
+                snapshotCompare.getTargetLocationFound().orElseThrow(
+                        () -> new RuntimeException("The location of the target on the snapshot was not found.")),
+                new Rectangle(311, 716, 275, 188));
         Assert.assertTrue(snapshotCompare.isMatch());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.PASSED);
     }
 
     @Test
@@ -145,8 +157,9 @@ public class FindImageWithImageTest {
         );
         saveResults(snapshotCompare, "FindWithNoYVariation");
         Assert.assertTrue(snapshotCompare.isFindInRegionModel());
-        Assert.assertEquals(snapshotCompare.getLocationOfTargetImageOnSnapshot().orElseThrow(() -> new RuntimeException("The location of the target on the snapshot was not found.")), new Rectangle(10, 0, 584, 1082));
+        Assert.assertEquals(snapshotCompare.getTargetLocationFound().orElseThrow(() -> new RuntimeException("The location of the target on the snapshot was not found.")), new Rectangle(10, 0, 584, 1082));
         Assert.assertTrue(snapshotCompare.isMatch());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.PASSED);
     }
 
     @Test
@@ -164,7 +177,8 @@ public class FindImageWithImageTest {
         );
         saveResults(snapshotCompare, "FindWithNoXVariation");
         Assert.assertTrue(snapshotCompare.isFindInRegionModel());
-        Assert.assertEquals(snapshotCompare.getLocationOfTargetImageOnSnapshot().orElseThrow(() -> new RuntimeException("The location of the target on the snapshot was not found.")), new Rectangle(0, 29, 604, 1010));
+        Assert.assertEquals(snapshotCompare.getTargetLocationFound().orElseThrow(() -> new RuntimeException("The location of the target on the snapshot was not found.")), new Rectangle(0, 29, 604, 1010));
         Assert.assertTrue(snapshotCompare.isMatch());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.PASSED);
     }
 }

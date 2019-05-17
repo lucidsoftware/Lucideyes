@@ -26,6 +26,7 @@ public class DifferentSizeImageTest {
         );
         saveResults(snapshotCompare, "SlightlyLargerSnapshot");
         Assert.assertTrue(snapshotCompare.isMatch());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.PASSED);
     }
 
     @Test
@@ -39,6 +40,7 @@ public class DifferentSizeImageTest {
         );
         saveResults(snapshotCompare, "SlightlyLargerSnapshot1");
         Assert.assertTrue(snapshotCompare.isMatch());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.PASSED);
     }
 
 
@@ -53,6 +55,7 @@ public class DifferentSizeImageTest {
         );
         saveResults(snapshotCompare, "SlightlyLargerMaster1");
         Assert.assertTrue(snapshotCompare.isMatch());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.PASSED);
     }
 
     @Test
@@ -66,6 +69,7 @@ public class DifferentSizeImageTest {
         );
         saveResults(snapshotCompare, "SlightlyLargerSnapshot2");
         Assert.assertTrue(snapshotCompare.isMatch());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.PASSED);
     }
 
     @Test
@@ -79,6 +83,7 @@ public class DifferentSizeImageTest {
         );
         saveResults(snapshotCompare, "SlightlyLargerMaster2");
         Assert.assertTrue(snapshotCompare.isMatch());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.PASSED);
     }
 
     @Test
@@ -92,6 +97,7 @@ public class DifferentSizeImageTest {
         );
         saveResults(snapshotCompare, "SlightlyLargerSnapshot3");
         Assert.assertTrue(snapshotCompare.isMatch());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.PASSED);
     }
 
     @Test
@@ -105,6 +111,7 @@ public class DifferentSizeImageTest {
         );
         saveResults(snapshotCompare, "SlightlyLargerMaster3");
         Assert.assertTrue(snapshotCompare.isMatch());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.PASSED);
     }
 
     @Test
@@ -121,6 +128,7 @@ public class DifferentSizeImageTest {
         );
         saveResults(snapshotCompare, "SlightlyLargerWithFocusMask");
         Assert.assertTrue(snapshotCompare.isMatch());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.PASSED);
     }
 
     @Test
@@ -137,9 +145,10 @@ public class DifferentSizeImageTest {
         );
         saveResults(snapshotCompare, "SlightlyLargerMasterWithFocusMask");
         Assert.assertTrue(snapshotCompare.isMatch());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.PASSED);
     }
 
-    @Test(expectedExceptions = IllegalArgumentException.class)
+    @Test
     public void testSlightlyLargerSnapshotWithPartialMask() throws IOException {
         BufferedImage standard = ImageIO.read(getFile("0pxOriginal.png"));
         BufferedImage snapshot = ImageIO.read(getFile("1pxBiggerWithDiff.png"));
@@ -151,9 +160,14 @@ public class DifferentSizeImageTest {
                 MatchLevel.TOLERANT,
                 mask
         );
+        saveResults(snapshotCompare, "SlightlyLargerSnapshotWithPartialMask");
+        Assert.assertFalse(snapshotCompare.isMatch());
+        Assert.assertFalse(snapshotCompare.isSameSize());
+        Assert.assertFalse(snapshotCompare.isSnapshotSizeAdjusted());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.DIFFERENT_SIZE);
     }
 
-    @Test(expectedExceptions = IllegalArgumentException.class)
+    @Test
     public void testSlightlyLargerMasterWithPartialMask() throws IOException {
         BufferedImage standard = ImageIO.read(getFile("1pxBiggerWithDiff.png"));
         BufferedImage snapshot = ImageIO.read(getFile("0pxOriginal.png"));
@@ -165,5 +179,10 @@ public class DifferentSizeImageTest {
                 MatchLevel.TOLERANT,
                 mask
         );
+        saveResults(snapshotCompare, "SlightlyLargerMasterWithPartialMask");
+        Assert.assertFalse(snapshotCompare.isMatch());
+        Assert.assertFalse(snapshotCompare.isSameSize());
+        Assert.assertFalse(snapshotCompare.isSnapshotSizeAdjusted());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.DIFFERENT_SIZE);
     }
 }

@@ -16,6 +16,9 @@ import static com.lucidchart.eyesopen.TestUtil.saveResults;
 
 public class ImageCompareTest {
 
+    // These tests take more than twice as long to run because they generate all on-demand result images.
+    // Image comparisons in practice are generally very fast.
+
     @Test
     public void testSelection() throws IOException {
         BufferedImage standard = ImageIO.read(getFile("Selected.PNG"));
@@ -30,6 +33,7 @@ public class ImageCompareTest {
         );
         saveResults(snapshotCompare, "BigDifferences");
         Assert.assertFalse(snapshotCompare.isMatch());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.FAILED);
     }
 
     @Test
@@ -46,6 +50,7 @@ public class ImageCompareTest {
         );
         saveResults(snapshotCompare, "SeveralDifferences");
         Assert.assertFalse(snapshotCompare.isMatch());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.FAILED);
     }
 
     @Test
@@ -63,6 +68,7 @@ public class ImageCompareTest {
         );
         saveResults(snapshotCompare, "CancelAnimation");
         Assert.assertTrue(snapshotCompare.isMatch());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.PASSED);
     }
 
     @Test
@@ -80,6 +86,7 @@ public class ImageCompareTest {
         );
         saveResults(snapshotCompare, "Very Small");
         Assert.assertFalse(snapshotCompare.isMatch());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.FAILED);
     }
 
     @Test
@@ -97,6 +104,7 @@ public class ImageCompareTest {
         );
         saveResults(snapshotCompare, "InsideInclusion");
         Assert.assertFalse(snapshotCompare.isMatch());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.FAILED);
     }
 
     @Test
@@ -114,6 +122,7 @@ public class ImageCompareTest {
         );
         saveResults(snapshotCompare, "OutsideFocus");
         Assert.assertTrue(snapshotCompare.isMatch());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.PASSED);
     }
 
     @Test
@@ -132,6 +141,7 @@ public class ImageCompareTest {
         );
         saveResults(snapshotCompare, "InsideFocusAndExcluded");
         Assert.assertTrue(snapshotCompare.isMatch());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.PASSED);
     }
 
     @Test
@@ -150,6 +160,7 @@ public class ImageCompareTest {
         );
         saveResults(snapshotCompare, "InsideFocusAndPartiallyExcluded");
         Assert.assertFalse(snapshotCompare.isMatch());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.FAILED);
     }
 
     @Test
@@ -167,6 +178,7 @@ public class ImageCompareTest {
         );
         saveResults(snapshotCompare, "Excluded");
         Assert.assertTrue(snapshotCompare.isMatch());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.PASSED);
     }
 
     @Test
@@ -184,6 +196,7 @@ public class ImageCompareTest {
         );
         saveResults(snapshotCompare, "NotExcluded");
         Assert.assertFalse(snapshotCompare.isMatch());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.FAILED);
     }
 
     @Test
@@ -197,6 +210,7 @@ public class ImageCompareTest {
         );
         saveResults(snapshotCompare, "extraThinLine");
         Assert.assertFalse(snapshotCompare.isMatch());
+        Assert.assertEquals(snapshotCompare.getStatus(), Status.FAILED);
     }
 
     static class TestImages {

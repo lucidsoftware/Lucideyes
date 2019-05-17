@@ -59,4 +59,14 @@ public class Region {
     public int hashCode() {
         return Objects.hash(location, width, height, regionAction);
     }
+
+    @Override
+    public String toString() {
+        return "Region{" +
+                "location=" + location +
+                ", height=" + height +
+                ", width=" + width +
+                ", regionAction=" + regionAction +
+                '}';
+    }
 }

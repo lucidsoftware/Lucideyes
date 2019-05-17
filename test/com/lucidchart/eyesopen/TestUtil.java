@@ -26,8 +26,8 @@ public class TestUtil {
         saveImage(imageTest.getSnapshotWithMask(), name, "Snapshot-Masked");
         saveImage(imageTest.getMasterWithMask(), name, "Master-Masked");
         saveImage(imageTest.getBlockMask(), name, "Block Mask");
-        BufferedImage pixelDiff = imageTest.getPixelDiff();
-        saveImage(pixelDiff, name, "Pixel Diff");
+        saveImage(imageTest.getPixelDiff(), name, "Pixel Diff");
+        saveImage(imageTest.getSideBySide(), name, "SideBySide");
         saveImage(imageTest.getBlockColorComparisonResults(), name, "BlockColorComparisonMap");
         saveImage(imageTest.getCircledDiff(), name, "Marked-Up");
         try (PrintWriter out = new PrintWriter(Paths.get("./output/" + name + "/info.txt").toString())) {
