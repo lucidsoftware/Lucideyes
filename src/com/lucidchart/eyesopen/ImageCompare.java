@@ -101,9 +101,6 @@ public class ImageCompare {
     public final boolean masterProvided;
     public final boolean snapshotProvided;
 
-    /** Holds the location of the match on the snapshot, in the event the master and snapshot images are different sizes, and a subset of master was found on the snapshot. */
-    private Optional<BufferedImage> imageSubsetMatch = Optional.empty();
-
 
     /** Compares two images, with the ability to make adjustments of how closely images must match.
      * Image pixel dimensions must match, or the comparison will fail automatically
@@ -253,8 +250,8 @@ public class ImageCompare {
         // Snapshot and master must be equal at this point.
         // Expand the smaller image to make it the same size if it was not.  This will allow a side by side comparison of the two.
 
-        snapshotBuild = resizedSnapshot.orElse(imageSubsetMatch.orElse(snapshotBuild));
-        snapshotSizeAdjusted = (snapshotProvided && masterProvided && masterBuild.getWidth() == snapshotBuild.getWidth() && masterBuild.getHeight() == snapshotBuild.getHeight());
+        snapshotBuild = resizedSnapshot.orElse(snapshotBuild);
+        snapshotSizeAdjusted = resizedSnapshot.isPresent();
 
         if (!snapshotSizeAdjusted) {
             int maxWidth = Integer.max(snapshotBuild.getWidth(), masterBuild.getWidth());
@@ -1418,7 +1415,7 @@ public class ImageCompare {
                     blockResults.append(String.format("(%d,%d) %s %s| ", x, y, blockMask[x][y] ? "masked" : "unmasked", (!blockMask[x][y] ? String.format("%s<<%.1f>>%s", (blockColorDistances[x][y] > maxColorDistance ? ConsoleColor.ANSI_RED : ""), blockColorDistances[x][y], "" + ConsoleColor.ANSI_RESET) : "")));
                 }
             return "Standard Image Comparison: " +
-                    "\n\nMaster Size = (w" + masterHeight + ",h" + masterWidth +")" +
+                    "\n\nMaster Size = (w" + masterWidth + ",h" + masterHeight +")" +
                     "\nBlock Size = " + blockSize +
                     "\nNum Vertical Blocks = " + numVerticalBlocks +
                     "\nNum Horizontal Blocks = " + numHorizontalBlocks +
@@ -1432,7 +1429,7 @@ public class ImageCompare {
                     "";
         } else {
             return "Find specified image inside a region:" +
-                    "\n\nMaster Size = (w" + masterHeight + ",h" + masterWidth +")" +
+                    "\n\nMaster Size = (w" + masterWidth + ",h" + masterHeight +")" +
                     "\nMaster Sub Image Target = " + targetDefinition +
                     "\nLocate Target Within Bounding Box = " + targetFindRegion +
                     "\nMatch Found = " + match +
