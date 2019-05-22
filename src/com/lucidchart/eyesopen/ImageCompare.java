@@ -9,6 +9,7 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.*;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -101,6 +102,8 @@ public class ImageCompare {
     public final boolean masterProvided;
     public final boolean snapshotProvided;
 
+    /** The max seconds allowed to perform the image comparison before throwing an exception */
+    public final static int MAX_TIME = 100;
 
     /** Compares two images, with the ability to make adjustments of how closely images must match.
      * Image pixel dimensions must match, or the comparison will fail automatically
@@ -112,6 +115,9 @@ public class ImageCompare {
      */
 
     private ImageCompare(BufferedImage initialMaster, BufferedImage initialSnapshot, int blockSize, double maxColorDistance, Set<Region> maskComponents) {
+
+        // We will prevent image comparison requests which may take a very long time.
+        Instant timeLimit = Instant.now().plusSeconds(MAX_TIME);
 
         require(initialMaster != null || initialSnapshot != null, "At least one image must be provided");
         require(blockSize >= 1, "Block size must be greater than or equal to 1");
@@ -172,14 +178,14 @@ public class ImageCompare {
 
                     // If snapshot is bigger than master, check to see if master exists as a subset of snapshot
                     if (snapshotBuild.getWidth() > workingMasterWidth) {
-                        Optional<Rectangle> locationOfMatch = imageFoundWithin(masterBuild, null, null, snapshotBuild, tempBlockMask, MaskType.BLOCK);
+                        Optional<Rectangle> locationOfMatch = imageFoundWithin(masterBuild, null, null, snapshotBuild, tempBlockMask, MaskType.BLOCK, timeLimit);
                         resizedSnapshot = locationOfMatch.map(loc -> snapshotHolder.getSubimage(loc.x, loc.y, workingMasterWidth, workingMasterHeight));
                     }
 
                     // If master is bigger than snapshot, see if snapshot exists as a subset of master
                     else {
                         Color expandedColor = Color.MAGENTA;
-                        locationInMaster = imageFoundWithin(snapshotHolder, null, null, masterHolder, tempMask, MaskType.PIXEL);
+                        locationInMaster = imageFoundWithin(snapshotHolder, null, null, masterHolder, tempMask, MaskType.PIXEL, timeLimit);
 
                         // Expand snapshot to match master
                         Optional<Set<Rectangle>> addedSnapshotMargins = locationInMaster.map(loc -> {
@@ -301,7 +307,7 @@ public class ImageCompare {
             // Unused, but needs initialization
             this.blockComparisonMap = null;
 
-            Optional<Rectangle> targetLocationFound = imageFoundWithin(master, targetDefinition, targetFindRegion, snapshot, subRegionBlockMask, MaskType.BLOCK);
+            Optional<Rectangle> targetLocationFound = imageFoundWithin(master, targetDefinition, targetFindRegion, snapshot, subRegionBlockMask, MaskType.BLOCK, timeLimit);
             this.targetFound = targetLocationFound.orElse(null);
             this.match = (targetLocationFound.isPresent());
 
@@ -645,7 +651,7 @@ public class ImageCompare {
      * @param withinDef defines the boundaries on the snapshot within which the target image from master must be found
      * @param withinImage the full snapshot image on which we are looking for the target image from master
      * @param mask is the composed block mask of the target sub-image we desire to find within the larger region.  If no blockMask is provided, a new mask will be composed at each position checked. */
-    private Optional<Rectangle> imageFoundWithin(BufferedImage targetImage, Region targetDef, Region withinDef, BufferedImage withinImage, boolean[][] mask, MaskType maskType) {
+    private Optional<Rectangle> imageFoundWithin(BufferedImage targetImage, Region targetDef, Region withinDef, BufferedImage withinImage, boolean[][] mask, MaskType maskType, Instant timeLimit) {
 
         Region workingWithinDef = (withinDef == null) ? Region.apply(0, 0, withinImage.getWidth(), withinImage.getHeight(), RegionAction.WITHIN_THIS_BOUNDING_BOX): withinDef;
 
@@ -666,6 +672,8 @@ public class ImageCompare {
 
         for (int x = 0; x <= xRange; x++)
             for (int y = 0; y <= yRange; y++) {
+                if (Instant.now().isAfter(timeLimit))
+                    throw new ImageCompareTimeOutException("Unable to find a match within " + MAX_TIME + "s.");
                 BufferedImage matchAttempt = within.getSubimage(x, y, requirement.getWidth(), requirement.getHeight());
                 boolean[][] effectiveBlockMask =
                         maskType == MaskType.BLOCK ?
