@@ -15,6 +15,7 @@ public class MatchLevel {
     public static final MatchLevel EXACT = MatchLevel.apply(1, 1.0);
     public static final MatchLevel STRICT = MatchLevel.apply(5, 14.0);
     public static final MatchLevel TOLERANT = MatchLevel.apply(10, 20.0);
+    public static final MatchLevel VERY_TOLERANT = MatchLevel.apply(12, 50.0);
 
     public int blockSize;
     public double maxColorDistance;

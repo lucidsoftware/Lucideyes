@@ -28,8 +28,9 @@ public class ImageCompareTest {
         ImageCompare snapshotCompare = ImageCompare.apply(
                 standard,
                 snapshot,
-                MatchLevel.TOLERANT,
-                mask
+                With.context()
+                        .matchLevel(MatchLevel.TOLERANT)
+                        .mask(mask)
         );
         saveResults(snapshotCompare, "BigDifferences");
         Assert.assertFalse(snapshotCompare.isMatch());
@@ -40,13 +41,12 @@ public class ImageCompareTest {
     public void testSeveralDifferences() throws IOException {
         BufferedImage standard = ImageIO.read(getFile("UnSynced.PNG"));
         BufferedImage snapshot = ImageIO.read(getFile("Synced.PNG"));
-        Set<Region> mask = new HashSet<>();
-        mask.add(Region.apply(233, 373, 848, 416, RegionAction.FOCUS));
         ImageCompare snapshotCompare = ImageCompare.apply(
                 standard,
                 snapshot,
-                MatchLevel.TOLERANT,
-                mask
+                With.context()
+                    .matchLevel(MatchLevel.TOLERANT)
+                    .mask(Region.apply(233, 373, 848, 416, RegionAction.FOCUS))
         );
         saveResults(snapshotCompare, "SeveralDifferences");
         Assert.assertFalse(snapshotCompare.isMatch());
@@ -63,8 +63,9 @@ public class ImageCompareTest {
         ImageCompare snapshotCompare = ImageCompare.apply(
                 standard,
                 snapshot,
-                MatchLevel.TOLERANT,
-                mask
+                With.context()
+                    .matchLevel(MatchLevel.TOLERANT)
+                    .mask(mask)
         );
         saveResults(snapshotCompare, "CancelAnimation");
         Assert.assertTrue(snapshotCompare.isMatch());
@@ -81,8 +82,9 @@ public class ImageCompareTest {
         ImageCompare snapshotCompare = ImageCompare.apply(
                 standard,
                 snapshot,
-                MatchLevel.STRICT,
-                mask
+                With.context()
+                    .matchLevel(MatchLevel.STRICT)
+                    .mask(mask)
         );
         saveResults(snapshotCompare, "Very Small");
         Assert.assertFalse(snapshotCompare.isMatch());
@@ -99,8 +101,9 @@ public class ImageCompareTest {
         ImageCompare snapshotCompare = ImageCompare.apply(
                 standard,
                 snapshot,
-                MatchLevel.STRICT,
-                mask
+                With.context()
+                    .matchLevel(MatchLevel.STRICT)
+                    .mask(mask)
         );
         saveResults(snapshotCompare, "InsideInclusion");
         Assert.assertFalse(snapshotCompare.isMatch());
@@ -117,8 +120,9 @@ public class ImageCompareTest {
         ImageCompare snapshotCompare = ImageCompare.apply(
                 standard,
                 snapshot,
-                MatchLevel.TOLERANT,
-                mask
+                With.context()
+                    .matchLevel(MatchLevel.TOLERANT)
+                    .mask(mask)
         );
         saveResults(snapshotCompare, "OutsideFocus");
         Assert.assertTrue(snapshotCompare.isMatch());
@@ -136,8 +140,9 @@ public class ImageCompareTest {
         ImageCompare snapshotCompare = ImageCompare.apply(
                 standard,
                 snapshot,
-                MatchLevel.STRICT,
-                mask
+                With.context()
+                    .matchLevel(MatchLevel.STRICT)
+                    .mask(mask)
         );
         saveResults(snapshotCompare, "InsideFocusAndExcluded");
         Assert.assertTrue(snapshotCompare.isMatch());
@@ -155,8 +160,9 @@ public class ImageCompareTest {
         ImageCompare snapshotCompare = ImageCompare.apply(
                 standard,
                 snapshot,
-                MatchLevel.TOLERANT,
-                mask
+                With.context()
+                    .matchLevel(MatchLevel.TOLERANT)
+                    .mask(mask)
         );
         saveResults(snapshotCompare, "InsideFocusAndPartiallyExcluded");
         Assert.assertFalse(snapshotCompare.isMatch());
@@ -173,8 +179,9 @@ public class ImageCompareTest {
         ImageCompare snapshotCompare = ImageCompare.apply(
                 standard,
                 snapshot,
-                MatchLevel.TOLERANT,
-                mask
+                With.context()
+                    .matchLevel(MatchLevel.TOLERANT)
+                    .mask(mask)
         );
         saveResults(snapshotCompare, "Excluded");
         Assert.assertTrue(snapshotCompare.isMatch());
@@ -191,8 +198,9 @@ public class ImageCompareTest {
         ImageCompare snapshotCompare = ImageCompare.apply(
                 standard,
                 snapshot,
-                MatchLevel.STRICT,
-                mask
+                With.context()
+                    .matchLevel(MatchLevel.TOLERANT)
+                    .mask(mask)
         );
         saveResults(snapshotCompare, "NotExcluded");
         Assert.assertFalse(snapshotCompare.isMatch());
@@ -206,7 +214,8 @@ public class ImageCompareTest {
         ImageCompare snapshotCompare = ImageCompare.apply(
                 standard,
                 snapshot,
-                MatchLevel.STRICT
+                With.context()
+                    .matchLevel(MatchLevel.STRICT)
         );
         saveResults(snapshotCompare, "extraThinLine");
         Assert.assertFalse(snapshotCompare.isMatch());
@@ -273,19 +282,28 @@ public class ImageCompareTest {
 
             // Get Exact
             boolean exactResult = ImageCompare
-                    .apply(ImageIO.read(getFile(testImage.stdImage+".jpg")), ImageIO.read(getFile(testImage.testImage+".jpg")), MatchLevel.EXACT)
+                    .apply(
+                            ImageIO.read(getFile(testImage.stdImage+".jpg")),
+                            ImageIO.read(getFile(testImage.testImage+".jpg")),
+                            With.context().matchLevel(MatchLevel.EXACT))
                     .isMatch();
             boolean exactPassed = testImage.exact && exactResult || !testImage.exact && !exactResult;
 
             // Get Strict
             boolean strictResult = ImageCompare
-                    .apply(ImageIO.read(getFile(testImage.stdImage+".jpg")), ImageIO.read(getFile(testImage.testImage+".jpg")), MatchLevel.STRICT)
+                    .apply(
+                            ImageIO.read(getFile(testImage.stdImage+".jpg")),
+                            ImageIO.read(getFile(testImage.testImage+".jpg")),
+                            With.context().matchLevel(MatchLevel.STRICT))
                     .isMatch();
             boolean strictPassed = testImage.strict && strictResult || !testImage.strict && !strictResult;
 
             // Get Tolerant
             boolean tolerantResult = ImageCompare
-                    .apply(ImageIO.read(getFile(testImage.stdImage+".jpg")), ImageIO.read(getFile(testImage.testImage+".jpg")), MatchLevel.TOLERANT)
+                    .apply(
+                            ImageIO.read(getFile(testImage.stdImage+".jpg")),
+                            ImageIO.read(getFile(testImage.testImage+".jpg")),
+                            With.context().matchLevel(MatchLevel.TOLERANT))
                     .isMatch();
             boolean tolerantPassed = testImage.tolerant && tolerantResult || !testImage.tolerant && !tolerantResult;
 
