@@ -84,7 +84,8 @@ public class ImageCompare {
 
     /** Holds the result comparisons, when and if created */
     private BufferedImage pixelDiff;
-    private BufferedImage sideBySide;
+    private BufferedImage circledDiffSideBySide;
+    private BufferedImage pixelDiffSideBySide;
 
     /** Provides a way of seeing the current max color difference of corresponding blocks in the images */
     private double largestColorDiff = 0.0;
@@ -491,28 +492,46 @@ public class ImageCompare {
         } else return createMessageImage(commonError("Circled diff report"));
     }
 
-    /** Get a side by side image comparison result */
-    public BufferedImage getSideBySide(Status status, String testName, String snapshotName) {
-        if (sideBySide == null) sideBySide = createSideBySide(status, testName, snapshotName);
-        return sideBySide;
+    /** Get a side by side image comparison result with Circled Diffs */
+    public BufferedImage getCircledDiffSideBySide(Status status, String testName, String snapshotName) {
+        if (circledDiffSideBySide == null) circledDiffSideBySide = createCircledDiffSideBySide(status, testName, snapshotName);
+        return circledDiffSideBySide;
     }
 
-    public BufferedImage getSideBySide(String testName, String snapshotName) {
-        if (sideBySide == null) sideBySide = createSideBySide(status, testName, snapshotName);
-        return sideBySide;
+    public BufferedImage getCircledDiffSideBySide(String testName, String snapshotName) {
+        if (circledDiffSideBySide == null) circledDiffSideBySide = createCircledDiffSideBySide(status, testName, snapshotName);
+        return circledDiffSideBySide;
     }
 
-    public BufferedImage getSideBySide() {
-        if (sideBySide == null) sideBySide = createSideBySide(status, "", "");
-        return sideBySide;
+    public BufferedImage getCircledDiffSideBySide() {
+        if (circledDiffSideBySide == null) circledDiffSideBySide = createCircledDiffSideBySide(status, "", "");
+        return circledDiffSideBySide;
+    }
+
+    /** Get a side by side image comparison result with Circled Diffs*/
+    public BufferedImage getPixelDiffSideBySide(Status status, String testName, String snapshotName) {
+        if (pixelDiffSideBySide == null) pixelDiffSideBySide = createPixelDiffSideBySide(status, testName, snapshotName);
+        return pixelDiffSideBySide;
+    }
+
+    public BufferedImage getPixelDiffSideBySide(String testName, String snapshotName) {
+        if (pixelDiffSideBySide == null) pixelDiffSideBySide = createPixelDiffSideBySide(status, testName, snapshotName);
+        return pixelDiffSideBySide;
+    }
+
+    public BufferedImage getPixelDiffSideBySide() {
+        if (pixelDiffSideBySide == null) pixelDiffSideBySide = createPixelDiffSideBySide(status, "", "");
+        return pixelDiffSideBySide;
     }
 
     /** Obtain a pixel-diff overlay **/
     public BufferedImage getPixelDiff() {
-        if (comparisonModel == ComparisonModel.STANDARD && pixelDiff == null) {
-            pixelDiff = createPixelDiffImage(master, snapshot, blockComparisonMap, blockMask, blockSize, maxColorDistance);
-            return pixelDiff;
-        } else return createMessageImage(commonError("Pixel diff report"));
+        if (pixelDiff == null) {
+            pixelDiff = (comparisonModel == ComparisonModel.STANDARD) ?
+                createPixelDiffImage(master, snapshot, blockComparisonMap, blockMask, blockSize, maxColorDistance) :
+                    createMessageImage(commonError("Pixel diff report"));
+        }
+        return pixelDiff;
     }
 
     /** True if the snapshot matches the master, based on block size, color proximity, image size, and mask */
@@ -1291,8 +1310,68 @@ public class ImageCompare {
     }
 
 
-    /** Creates a side by side image comparison of the snapshot and master image */
-    private BufferedImage createSideBySide(Status imageTag, String currentTestName, String currentSnapshotName) {
+    /** Creates a side by side image comparison fo the snapshot and master image */
+    private BufferedImage createSideBySide(BufferedImage master, BufferedImage snapshot, Status imageTag, String currentTestName, String currentSnapshotName) {
+        SnapshotSize snapshotSize = getSnapshotSize(snapshot.getWidth());
+        Font standardFont = new Font(Font.SANS_SERIF, Font.PLAIN, snapshotSize.fontSize);
+        Font boldFont = new Font(Font.SANS_SERIF, Font.BOLD, snapshotSize.fontSize);
+        int outlineStroke = snapshotSize.outlineStroke;
+        // Start with a black background.
+        Color backgroundColor = Color.BLACK;
+        // We're making the border with constant no matter what the image sizes.
+        int border = 130;
+        int snapshotWidth = snapshot != null ? snapshot.getWidth(): master.getWidth();
+        int snapshotHeight = snapshot != null ? snapshot.getHeight() : master.getHeight();
+        int masterWidth = master != null ? master.getWidth() : snapshotWidth;
+        int masterHeight = master != null ? master.getHeight() : snapshotHeight;
+        // We'll add an additional 1/6 at the top for title and status to form the final dimension of the side by side image
+        int maxHeight = masterHeight > snapshotHeight ? masterHeight : snapshotHeight;
+        int finalWidth = border + masterWidth + border + snapshotWidth + border;
+        int finalHeight = border * 2 + maxHeight + border;
+        // Create the base for the new side by side image :)
+        BufferedImage sideBySide = new BufferedImage(finalWidth, finalHeight, BufferedImage.TYPE_INT_RGB);
+        Graphics2D graph = sideBySide.createGraphics();
+        graph.setColor(backgroundColor);
+        graph.fill(new Rectangle(0, 0, finalWidth, finalHeight));
+        // Add the snapshot image :)
+        Point snapshotLocation = new Point(border + snapshotWidth + border, border * 2 + (maxHeight - snapshotHeight) / 2);
+        if (snapshot != null) {
+            graph.drawImage(
+                    snapshot,
+                    null,
+                    snapshotLocation.x,
+                    snapshotLocation.y);
+        } else {
+            drawCenteredText(graph, standardFont, "No Snapshot Image", new Rectangle(snapshotLocation.x, snapshotLocation.y, snapshotWidth, snapshotHeight), Color.LIGHT_GRAY);
+        }
+        drawRectangle(graph, outlineStroke, snapshotLocation.x, snapshotLocation.y, snapshotWidth, snapshotHeight, imageTag.tagColor);
+        // Add the master image :)
+        Point masterLocation = new Point(border, border * 2 + (maxHeight - masterHeight) / 2);
+        if (master != null) {
+            graph.drawImage(
+                    master,
+                    null,
+                    masterLocation.x,
+                    masterLocation.y);
+        } else {
+            drawCenteredText(graph, standardFont, "No Master Image", new Rectangle(masterLocation.x, masterLocation.y, masterWidth, masterHeight), Color.LIGHT_GRAY);
+        }
+        drawRectangle(graph, outlineStroke, masterLocation.x, masterLocation.y, masterWidth, masterHeight, master != null ? Status.MASTER_IMAGE.tagColor : Color.DARK_GRAY);
+        // Add test and snapshot names
+        int halfFontSize = snapshotSize.fontSize / 2 + 2;
+        drawText(graph, standardFont, currentTestName, border, border - halfFontSize, Color.LIGHT_GRAY);
+        drawText(graph, boldFont, currentSnapshotName, border, border + halfFontSize, Color.WHITE);
+        // Current Status Tag
+        drawText(graph, standardFont, imageTag.text, border, border + halfFontSize * 3, imageTag.tagColor);
+        // Add expected and actual labels
+        drawText(graph, standardFont, "Expected" + (!sameSize && masterProvided && snapshotProvided ? " (w" + originalMaster.getWidth() + ", h" + originalMaster.getHeight() + ")" : ""), border, border * 2 - halfFontSize, Color.LIGHT_GRAY);
+        drawText(graph, standardFont, "Actual" + (!sameSize && masterProvided && snapshotProvided ? " (w" + originalSnapshot.getWidth() + ", h" + originalSnapshot.getHeight() + ")" : "") + (snapshotSizeAdjusted ? " Adjusted" : ""), finalWidth - border - snapshotWidth, border * 2 - halfFontSize, Color.LIGHT_GRAY);
+        return sideBySide;
+    }
+
+
+    /** Creates a side by side image comparison of the snapshot and master image with circled diffs */
+    private BufferedImage createCircledDiffSideBySide(Status imageTag, String currentTestName, String currentSnapshotName) {
 
 
         require(snapshotProvided || masterProvided, "At a minimum, one image must be provided for a side by side comparison image");
@@ -1307,72 +1386,28 @@ public class ImageCompare {
                 snapshotSize == SnapshotSize.XS || !masterProvided || !sameSize || comparisonModel == ComparisonModel.FIND_WITH_REGION ? getSnapshotWithMask() :
                         getCircledDiff() :
                 this.snapshot;
+        return createSideBySide(master, snapshot, imageTag, currentTestName, currentSnapshotName);
 
-        Font standardFont = new Font(Font.SANS_SERIF, Font.PLAIN, snapshotSize.fontSize);
-        Font boldFont = new Font(Font.SANS_SERIF, Font.BOLD, snapshotSize.fontSize);
-        int outlineStroke = snapshotSize.outlineStroke;
-
-        // Start with a black background.
-        Color backgroundColor = Color.BLACK;
-
-        // We're making the border with constant no matter what the image sizes.
-        int border = 130;
-
-        int snapshotWidth = snapshot != null ? snapshot.getWidth(): master.getWidth();
-        int snapshotHeight = snapshot != null ? snapshot.getHeight() : master.getHeight();
-        int masterWidth = master != null ? master.getWidth() : snapshotWidth;
-        int masterHeight = master != null ? master.getHeight() : snapshotHeight;
-
-        // We'll add an additional 1/6 at the top for title and status to form the final dimension of the side by side image
-        int maxHeight = masterHeight > snapshotHeight ? masterHeight : snapshotHeight;
-        int finalWidth = border + masterWidth + border + snapshotWidth + border;
-        int finalHeight = border * 2 + maxHeight + border;
-
-        // Create the base for the new side by side image :)
-        BufferedImage sideBySide = new BufferedImage(finalWidth, finalHeight, BufferedImage.TYPE_INT_RGB);
-        Graphics2D graph = sideBySide.createGraphics();
-        graph.setColor(backgroundColor);
-        graph.fill(new java.awt.Rectangle(0, 0, finalWidth, finalHeight));
-
-        // Add the snapshot image :)
-        Point snapshotLocation = new Point(border + snapshotWidth + border, border * 2 + (maxHeight - snapshotHeight) / 2);
-        if (snapshot != null) {
-            graph.drawImage(
-                    snapshot,
-                    null,
-                    snapshotLocation.x,
-                    snapshotLocation.y);
-        } else {
-            drawCenteredText(graph, standardFont, "No Snapshot Image", new java.awt.Rectangle(snapshotLocation.x, snapshotLocation.y, snapshotWidth, snapshotHeight), Color.LIGHT_GRAY);
-        }
-        drawRectangle(graph, outlineStroke, snapshotLocation.x, snapshotLocation.y, snapshotWidth, snapshotHeight, imageTag.tagColor);
-
-        // Add the master image :)
-        Point masterLocation = new Point(border, border * 2 + (maxHeight - masterHeight) / 2);
-        if (master != null) {
-            graph.drawImage(
-                    master,
-                    null,
-                    masterLocation.x,
-                    masterLocation.y);
-        } else {
-            drawCenteredText(graph, standardFont, "No Master Image", new java.awt.Rectangle(masterLocation.x, masterLocation.y, masterWidth, masterHeight), Color.LIGHT_GRAY);
-        }
-        drawRectangle(graph, outlineStroke, masterLocation.x, masterLocation.y, masterWidth, masterHeight, master != null ? Status.MASTER_IMAGE.tagColor : Color.DARK_GRAY);
-
-        // Add test and snapshot names
-        int halfFontSize = snapshotSize.fontSize / 2 + 2;
-        drawText(graph, standardFont, currentTestName, border, border - halfFontSize, Color.LIGHT_GRAY);
-        drawText(graph, boldFont, currentSnapshotName, border, border + halfFontSize, Color.WHITE);
-
-        // Current Status Tag
-        drawText(graph, standardFont, imageTag.text, border, border + halfFontSize * 3, imageTag.tagColor);
-
-        // Add expected and actual labels
-        drawText(graph, standardFont, "Expected" + (!sameSize && masterProvided && snapshotProvided ? " (w" + originalMaster.getWidth() + ", h" + originalMaster.getHeight() + ")" : ""), border, border * 2 - halfFontSize, Color.LIGHT_GRAY);
-        drawText(graph, standardFont, "Actual" + (!sameSize && masterProvided && snapshotProvided ? " (w" + originalSnapshot.getWidth() + ", h" + originalSnapshot.getHeight() + ")" : "") + (snapshotSizeAdjusted ? " Adjusted" : ""), finalWidth - border - snapshotWidth, border * 2 - halfFontSize, Color.LIGHT_GRAY);
-        return sideBySide;
     }
+
+
+    /** Creates a side by side image comparison of the snapshot and master image with pixel diffs */
+    private BufferedImage createPixelDiffSideBySide(Status imageTag, String currentTestName, String currentSnapshotName) {
+
+        require(snapshotProvided || masterProvided, "At a minimum, one image must be provided for a side by side comparison image");
+        require(currentSnapshotName != null, "A snapshot name must be provided");
+        require(currentTestName != null, "A test name must be provided");
+        require(imageTag != null, "An image tag must be provided");
+
+        BufferedImage master = masterProvided ? getMasterWithMask() : this.master;
+        // Circling the snapshot diffs is not effective on very small snapshots, as the circle covers up too much of the snapshot, and it's small enough to notice the differences anyway
+        BufferedImage snapshot = snapshotProvided ?
+                !masterProvided || !sameSize || comparisonModel == ComparisonModel.FIND_WITH_REGION ? getSnapshotWithMask() :
+                        getPixelDiff() :
+                this.snapshot;
+        return createSideBySide(master, snapshot, imageTag, currentTestName, currentSnapshotName);
+    }
+
 
     /** Draws a rectangle on the graphics2d object, and restores the previous graphics2d stroke and color settings after rendering the rectangle. */
     private void drawRectangle(Graphics2D g, float thickness, int x, int y, int width, int height, Color color) {

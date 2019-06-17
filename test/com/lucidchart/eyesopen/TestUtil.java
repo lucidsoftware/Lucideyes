@@ -1,10 +1,6 @@
 package com.lucidchart.eyesopen;
 
-import org.testng.Assert;
-import org.testng.annotations.Test;
-
 import javax.imageio.ImageIO;
-import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -12,8 +8,6 @@ import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.HashSet;
-import java.util.Set;
 
 public class TestUtil {
 
@@ -27,9 +21,11 @@ public class TestUtil {
         saveImage(imageTest.getMasterWithMask(), name, "Master-Masked");
         saveImage(imageTest.getBlockMask(), name, "Block Mask");
         saveImage(imageTest.getPixelDiff(), name, "Pixel Diff");
-        saveImage(imageTest.getSideBySide(), name, "SideBySide");
+        saveImage(imageTest.getCircledDiffSideBySide(), name, "Circled Diff SideBySide");
+        saveImage(imageTest.getPixelDiffSideBySide(), name, "Pixel Diff SideBySide");
         saveImage(imageTest.getBlockColorComparisonResults(), name, "BlockColorComparisonMap");
         saveImage(imageTest.getCircledDiff(), name, "Marked-Up");
+
         try (PrintWriter out = new PrintWriter(Paths.get("./output/" + name + "/info.txt").toString())) {
             out.println(imageTest.toString());
         }
